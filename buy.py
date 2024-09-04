@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 from datetime import datetime
+import pytz
 
 # Function to create and provide a download link for the Excel template
 def generate_excel_template():
@@ -33,6 +34,13 @@ def generate_excel_file(df):
 def main():
     # Set the title of the application
     st.title("Buying Order Excel Processor")
+
+    # Get current time in Philippine timezone (UTC+8)
+    philippine_tz = pytz.timezone('Asia/Manila')
+    current_time = datetime.now(philippine_tz).strftime("%Y%m%d%H%M")
+    
+    # Dynamic output filename with the current time in the Philippine timezone
+    default_output_filename = f"Buy_{current_time}"
 
     # Sidebar for downloading the Excel template
     st.sidebar.title("Download Template")
@@ -85,8 +93,7 @@ def main():
             st.write("Processed data preview:")
             st.dataframe(new_df.head())
 
-            # Dynamically generate filename based on the current timestamp
-            current_time = datetime.now().strftime("%Y%m%d%H%M")
+            # Dynamically generate filename based on the current timestamp in Philippine timezone
             dynamic_output_filename = f"Buy_{current_time}.xlsx"
 
             # Provide a download button for the processed file with dynamic filename
