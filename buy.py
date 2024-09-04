@@ -21,6 +21,14 @@ def generate_excel_template():
     
     return output
 
+# Function to create a downloadable Excel file
+def generate_excel_file(df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='Processed Data')
+    output.seek(0)
+    return output
+
 # Streamlit app
 def main():
     # Set the title of the application
@@ -84,11 +92,14 @@ def main():
             st.write("Processed data preview:")
             st.dataframe(new_df.head())
 
-            # Button to download the processed file
-            if st.button("Save Processed File"):
-                output_path = f"{output_filename}.xlsx"
-                new_df.to_excel(output_path, index=False)
-                st.success(f"File saved successfully as {output_path}")
+            # Provide a download button for the processed file
+            processed_file = generate_excel_file(new_df)
+            st.download_button(
+                label="Download Processed File",
+                data=processed_file,
+                file_name=f"{output_filename}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
         else:
             st.error("The uploaded file is missing some required columns.")
     else:
