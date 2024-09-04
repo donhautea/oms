@@ -34,10 +34,6 @@ def main():
     # Set the title of the application
     st.title("Buying Order Excel Processor")
 
-    # Generate current timestamp for the default filename
-    current_time = datetime.now().strftime("%Y%m%d%H%M")
-    default_output_filename = f"Buy_{current_time}"
-
     # Sidebar for downloading the Excel template
     st.sidebar.title("Download Template")
     template = generate_excel_template()
@@ -71,9 +67,6 @@ def main():
     st.sidebar.title("Upload File")
     uploaded_file = st.sidebar.file_uploader("Choose an Excel file", type=["xlsx", "xls"])
 
-    # Sidebar for output file name input with default filename
-    output_filename = st.sidebar.text_input("Enter output filename (without extension)", value=default_output_filename)
-
     if uploaded_file:
         # Load the uploaded Excel file into a DataFrame
         df = pd.read_excel(uploaded_file)
@@ -92,12 +85,16 @@ def main():
             st.write("Processed data preview:")
             st.dataframe(new_df.head())
 
-            # Provide a download button for the processed file
+            # Dynamically generate filename based on the current timestamp
+            current_time = datetime.now().strftime("%Y%m%d%H%M")
+            dynamic_output_filename = f"Buy_{current_time}.xlsx"
+
+            # Provide a download button for the processed file with dynamic filename
             processed_file = generate_excel_file(new_df)
             st.download_button(
                 label="Download Processed File",
                 data=processed_file,
-                file_name=f"{output_filename}.xlsx",
+                file_name=dynamic_output_filename,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
         else:
