@@ -71,7 +71,7 @@ def main():
     try:
         equity_isin_master_df = pd.read_csv(equity_isin_master_path)
         # Keep only 'Equity Security Code' and 'Equity ISIN Code'
-        equity_isin_master_df = equity_isin_master_df[['Equity Security Code', 'Equity ISIN Code']]
+        equity_isin_master_df = equity_isin_master_df[['Equity Security Code', 'Equity ISIN Code']].drop_duplicates()
     except FileNotFoundError:
         st.error(f"EquityISIN_Masters.csv not found at {equity_isin_master_path}")
         return
@@ -143,6 +143,9 @@ def process_file(df, broker_master_df, scheme_master_df, equity_isin_master_df):
 
     # Merge the df with the EquityISIN_Masters.csv on 'Stock' and 'Equity Security Code'
     df = df.merge(equity_isin_master_df, left_on='Stock', right_on='Equity Security Code', how='left')
+
+    # Drop duplicates from the merge (if any)
+    df = df.drop_duplicates(subset=['Stock', 'Fund', 'Shares', 'Price Limit', 'Classification', 'Broker'])
 
     # Replace ISIN in the new DataFrame where Stock matches the Equity Security Code
     df['ISIN'] = df.apply(
