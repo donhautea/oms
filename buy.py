@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 from datetime import datetime
-import pytz
 
 # Function to create and provide a download link for the Excel template
 def generate_excel_template():
@@ -35,11 +34,8 @@ def main():
     # Set the title of the application
     st.title("Buying Order Excel Processor")
 
-    # Get current time in Philippine timezone (UTC+8)
-    philippine_tz = pytz.timezone('Asia/Manila')
-    current_time = datetime.now(philippine_tz).strftime("%Y%m%d%H%M")
-    
-    # Dynamic output filename with the current time in the Philippine timezone
+    # Generate current timestamp for the default filename
+    current_time = datetime.now().strftime("%Y%m%d%H%M")
     default_output_filename = f"Buy_{current_time}"
 
     # Sidebar for downloading the Excel template
@@ -53,9 +49,10 @@ def main():
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-    # Read the Broker_Master.csv from the local directory
+    # Read the Broker_Master.csv, Scheme_Master.csv, and EquityISIN_Masters.csv from the local directory
     broker_master_path = "Broker_Master.csv"  # Adjust the path if necessary
     scheme_master_path = "Scheme_Master.csv"  # Adjust the path if necessary
+    equity_isin_master_path = "EquityISIN_Masters.csv"  # Adjust the path if necessary
     
     try:
         broker_master_df = pd.read_csv(broker_master_path)
@@ -71,9 +68,20 @@ def main():
         st.error(f"Scheme_Master.csv not found at {scheme_master_path}")
         return
 
+    try:
+        equity_isin_master_df = pd.read_csv(equity_isin_master_path)
+        # Keep only 'Equity Security Code' and 'Equity ISIN Code'
+        equity_isin_master_df = equity_isin_master_df[['Equity Security Code', 'Equity ISIN Code']]
+    except FileNotFoundError:
+        st.error(f"EquityISIN_Masters.csv not found at {equity_isin_master_path}")
+        return
+
     # Sidebar for uploading the file
     st.sidebar.title("Upload File")
     uploaded_file = st.sidebar.file_uploader("Choose an Excel file", type=["xlsx", "xls"])
+
+    # Sidebar for output file name input with default filename
+    output_filename = st.sidebar.text_input("Enter output filename (without extension)", value=default_output_filename)
 
     if uploaded_file:
         # Load the uploaded Excel file into a DataFrame
@@ -87,21 +95,18 @@ def main():
         required_columns = ['Order Type', 'Stock', 'Fund', 'Shares', 'Price Limit', 'Value', 'Classification', 'Broker', 'Remarks']
         if all(col in df.columns for col in required_columns):
             # Process the file
-            new_df = process_file(df, broker_master_df, scheme_master_df)
+            new_df = process_file(df, broker_master_df, scheme_master_df, equity_isin_master_df)
 
             # Show the processed data
             st.write("Processed data preview:")
             st.dataframe(new_df.head())
 
-            # Dynamically generate filename based on the current timestamp in Philippine timezone
-            dynamic_output_filename = f"Buy_{current_time}.xlsx"
-
-            # Provide a download button for the processed file with dynamic filename
+            # Provide a download button for the processed file
             processed_file = generate_excel_file(new_df)
             st.download_button(
                 label="Download Processed File",
                 data=processed_file,
-                file_name=dynamic_output_filename,
+                file_name=f"{output_filename}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
         else:
@@ -110,7 +115,7 @@ def main():
         st.warning("Please upload an Excel file.")
 
 # Function to process the uploaded file and create a new DataFrame
-def process_file(df, broker_master_df, scheme_master_df):
+def process_file(df, broker_master_df, scheme_master_df, equity_isin_master_df):
     # Convert Broker to uppercase before merging
     df['Broker'] = df['Broker'].str.upper()
 
@@ -136,11 +141,20 @@ def process_file(df, broker_master_df, scheme_master_df):
 
     df = df[df['SchemeShortNameValid']]
 
+    # Merge the df with the EquityISIN_Masters.csv on 'Stock' and 'Equity Security Code'
+    df = df.merge(equity_isin_master_df, left_on='Stock', right_on='Equity Security Code', how='left')
+
+    # Replace ISIN in the new DataFrame where Stock matches the Equity Security Code
+    df['ISIN'] = df.apply(
+        lambda row: row['Equity ISIN Code'] if pd.notna(row['Equity ISIN Code']) else row['Stock'],
+        axis=1
+    )
+
     # Creating the new DataFrame with mapped columns
     new_df = pd.DataFrame({
         'AssetClassification': ['Equity'] * len(df),
         'SchemeShortName': df['SchemeShortName'],
-        'ISIN': df['Stock'],  # ISIN is now uppercase from Stock
+        'ISIN': df['ISIN'],  # ISIN is now mapped from Stock or Equity Security Code
         'InstrumentHoldingType': df['Classification'],
         'BrokerShortname': df['BrokerShortname'],
         'ExchangeShortName': ['PSE'] * len(df),
@@ -152,6 +166,7 @@ def process_file(df, broker_master_df, scheme_master_df):
         'Validity': ['GFD'] * len(df),
         'Remarks': df['Remarks']
     })
+
     return new_df
 
 if __name__ == "__main__":
